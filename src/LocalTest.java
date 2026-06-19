@@ -1,7 +1,6 @@
 import ij.IJ;
 import ij.ImagePlus;
 import ij.process.ByteProcessor;
-
 import java.io.File;
 import java.util.*;
 
@@ -26,7 +25,7 @@ public class LocalTest {
         }
 
         Arrays.sort(images, Comparator.comparing(File::getName));
-        MetricHistogram extractor = new MetricHistogram();
+        Metric_Histogram extractor = new Metric_Histogram();
 
         // Referencia: primeira imagem da pasta
         ImagePlus ref = IJ.openImage(images[0].getAbsolutePath());
@@ -41,13 +40,13 @@ public class LocalTest {
         System.out.println();
 
         // Demais imagens como base de busca
-        List<MetricHistogram.ImageEntry> entries = new ArrayList<>();
+        List<Metric_Histogram.ImageEntry> entries = new ArrayList<>();
         for (int i = 1; i < images.length; i++) {
             ImagePlus img = IJ.openImage(images[i].getAbsolutePath());
             if (img == null) continue;
             ByteProcessor bp = img.getProcessor().convertToByteProcessor();
             double[] vec = extractor.extractFeatures(bp);
-            entries.add(new MetricHistogram.ImageEntry(images[i].getName(), vec));
+            entries.add(new Metric_Histogram.ImageEntry(images[i].getName(), vec));
             img.close();
         }
 
@@ -57,12 +56,12 @@ public class LocalTest {
         int k = Math.min(5, entries.size());
         for (String distFunc : new String[]{"Euclidiana", "Manhattan", "Chebyshev"}) {
             // copia para não alterar a ordem original
-            List<MetricHistogram.ImageEntry> copy = new ArrayList<>(entries);
-            List<MetricHistogram.ImageEntry> results = extractor.knnSearch(refVec, copy, k, distFunc);
+            List<Metric_Histogram.ImageEntry> copy = new ArrayList<>(entries);
+            List<Metric_Histogram.ImageEntry> results = extractor.knnSearch(refVec, copy, k, distFunc);
 
             System.out.println("--- Top " + k + " vizinhos (" + distFunc + ") ---");
             for (int i = 0; i < results.size(); i++) {
-                MetricHistogram.ImageEntry e = results.get(i);
+                Metric_Histogram.ImageEntry e = results.get(i);
                 System.out.printf("  %d. %-30s dist=%.6f  pts=%d%n",
                         i + 1, e.name, e.distance, e.vector.length / 2);
             }

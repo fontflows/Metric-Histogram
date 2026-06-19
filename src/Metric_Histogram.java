@@ -2,7 +2,6 @@ import ij.*;
 import ij.gui.GenericDialog;
 import ij.plugin.PlugIn;
 import ij.process.ByteProcessor;
-
 import java.io.*;
 import java.util.*;
 
@@ -13,7 +12,7 @@ import java.util.*;
  * <p>Fluxo: abre imagem de referência → seleciona pasta de busca →
  * extrai vetores de características → executa k-NN com função de distância escolhida.</p>
  */
-public class MetricHistogram implements PlugIn {
+public class Metric_Histogram implements PlugIn {
 
     /** Limiar de erro de área para determinar novos pontos de controle. */
     private static final double AREA_ERROR_THRESHOLD = 0.01;
