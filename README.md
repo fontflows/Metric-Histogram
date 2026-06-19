@@ -22,7 +22,7 @@ Metric-Histogram/
 
 ## Pré-requisitos
 
-- Java 11+
+- Java 8+
 - Maven 3.6+
 - ImageJ instalado (para usar o plugin)
 
