@@ -32,7 +32,7 @@ public class Metric_Histogram implements PlugIn {
         double[] refVec = extractFeatures(refImg.getProcessor().convertToByteProcessor());
 
         File dir = new File(folder);
-        File[] files = dir.listFiles((d, n) -> n.toLowerCase().matches(".*\\.(bmp|png|jpg|jpeg|tif|tiff)"));
+        File[] files = dir.listFiles((d, n) -> n.toLowerCase().matches(".*\\.(bmp|png|jpg|jpeg|tif|tiff|gif)"));
         if (files == null || files.length == 0) {
             IJ.error("Nenhuma imagem encontrada na pasta selecionada.");
             return;
