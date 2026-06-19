@@ -22,7 +22,7 @@ Metric-Histogram/
 
 ## Pré-requisitos
 
-- Java 11+
+- Java 8+
 - Maven 3.6+
 - ImageJ instalado (para usar o plugin)
 
@@ -96,7 +96,7 @@ Copie o JAR gerado para a pasta `plugins/` da instalação do ImageJ.
 
 - Abra o ImageJ.
 - Abra a imagem de referência (File > Open).
-- Vá em Plugins > metric-histogram > MetricHistogram.
+- Vá em Plugins > Metric Histogram.
 - Selecione a pasta com as imagens de busca.
 - Aguarde a extração dos vetores (uma barra de progresso aparece).
 - Na janela que abre, informe o valor de k e escolha a função de distância.
