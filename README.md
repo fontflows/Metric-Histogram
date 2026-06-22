@@ -124,7 +124,7 @@ O algoritmo percorre os bins sequencialmente. Para cada segmento entre dois bins
 erro = |soma real dos bins - área do trapézio formado pelos extremos|
 ```
 
-Quando esse erro supera um limiar (1% por padrão), o bin anterior ao ponto de erro é registrado como um ponto de controle, e a análise reinicia a partir dele.
+Quando esse erro supera um limiar (5% por padrão), o bin anterior ao ponto de erro é registrado como um ponto de controle, e a análise reinicia a partir dele.
 
 **Passo 3 — Vetor de características:**
 Cada ponto de controle tem coordenadas (x, y), onde x é o nível de cinza (normalizado entre 0 e 1) e y é a frequência normalizada. O vetor final é a concatenação dessas coordenadas:

@@ -5,36 +5,51 @@
          http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-	<parent>
-		<groupId>org.scijava</groupId>
-		<artifactId>pom-scijava</artifactId>
-		<version>31.1.0</version>
-		<relativePath />
-	</parent>
-
     <groupId>br.usp.rpi</groupId>
     <artifactId>metric_histogram</artifactId>
     <version>1.0</version>
     <packaging>jar</packaging>
 
+    <name>Metric Histogram</name>
+    <description>Plugin ImageJ para extração de características via Histograma Métrico e k-NN</description>
+
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>8</maven.compiler.source>
+        <maven.compiler.target>8</maven.compiler.target>
     </properties>
 
     <dependencies>
-        <!-- ImageJ core -->
         <dependency>
             <groupId>net.imagej</groupId>
             <artifactId>ij</artifactId>
+            <version>1.54g</version>
         </dependency>
     </dependencies>
 
     <build>
-        <!-- fontes diretamente em src/ -->
         <sourceDirectory>src</sourceDirectory>
 
         <plugins>
-            <!-- JAR executável com todas as dependências (para deploy no ImageJ) -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.8.1</version>
+                <configuration>
+                    <source>8</source>
+                    <target>8</target>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <configuration>
+                    <mainClass>LocalTest</mainClass>
+                </configuration>
+            </plugin>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-assembly-plugin</artifactId>
@@ -51,16 +66,6 @@
                         <goals><goal>single</goal></goals>
                     </execution>
                 </executions>
-            </plugin>
-
-            <!-- Execução local do teste -->
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>exec-maven-plugin</artifactId>
-                <version>3.1.0</version>
-                <configuration>
-                    <mainClass>LocalTest</mainClass>
-                </configuration>
             </plugin>
         </plugins>
     </build>

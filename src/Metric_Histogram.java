@@ -15,7 +15,7 @@ import java.util.*;
 public class Metric_Histogram implements PlugIn {
 
     /** Limiar de erro de área para determinar novos pontos de controle. */
-    private static final double AREA_ERROR_THRESHOLD = 0.01;
+    private static final double AREA_ERROR_THRESHOLD = 0.05;
 
     @Override
     public void run(String arg) {
@@ -103,10 +103,12 @@ public class Metric_Histogram implements PlugIn {
 
         int start = 0;
         while (start < n - 1) {
-            int end = n - 1;
+            int end = start + 1;
             for (int j = start + 2; j < n; j++) {
-                if (areaError(h, start, j) > AREA_ERROR_THRESHOLD) {
-                    end = j - 1;
+                if (areaError(h, start, j) <= AREA_ERROR_THRESHOLD) {
+                    end = j;
+                }
+                else {
                     break;
                 }
             }
@@ -114,7 +116,7 @@ public class Metric_Histogram implements PlugIn {
                 pts.add(new double[]{end, h[end]});
                 start = end;
             } else {
-                start++;
+                break;
             }
         }
 
