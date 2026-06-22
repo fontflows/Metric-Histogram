@@ -13,6 +13,7 @@ import java.util.*;
 public class LocalTest {
 
     public static void main(String[] args) {
+        // Carrega todas as imagens .bmp do diretório de teste
         File testDir = new File("test-images");
         File[] images = testDir.listFiles((d, n) -> n.toLowerCase().endsWith(".bmp"));
 
@@ -21,13 +22,15 @@ public class LocalTest {
             return;
         }
 
+        // Ordena por nome para garantir reprodutibilidade
         Arrays.sort(images, Comparator.comparing(File::getName));
         Metric_Histogram extractor = new Metric_Histogram();
 
-        // Referência: primeira imagem
+        // Primeira imagem é usada como referência para a busca
         ImagePlus ref = IJ.openImage(images[0].getAbsolutePath());
         if (ref == null) { System.out.println("Erro ao abrir: " + images[0].getName()); return; }
 
+        // Extrai vetor de características da imagem de referência
         ByteProcessor bp  = ref.getProcessor().convertToByteProcessor();
         int[]    rawHist  = bp.getHistogram();
         double[] refVec   = extractor.extractFeatures(bp);
@@ -38,10 +41,10 @@ public class LocalTest {
         System.out.println("Vetor: " + Arrays.toString(refVec));
         System.out.println();
 
-        // exibe gráfico histograma convencional x métrico
+        // Exibe comparação visual: histograma convencional vs métrico
         HistogramChart.show(images[0].getName(), rawHist, refVec);
 
-        // demais imagens como base de busca
+        // Carrega demais imagens como base de busca
         List<Metric_Histogram.ImageEntry> entries = new ArrayList<>();
         for (int i = 1; i < images.length; i++) {
             ImagePlus img = IJ.openImage(images[i].getAbsolutePath());
@@ -53,7 +56,7 @@ public class LocalTest {
 
         System.out.printf("Total de imagens de busca: %d%n%n", entries.size());
 
-        // k-NN com as 3 funções de distância
+        // Executa k-NN com três funções de distância para comparar resultados
         int k = Math.min(5, entries.size());
         for (String dist : new String[]{"Euclidiana", "Manhattan", "Chebyshev"}) {
             List<Metric_Histogram.ImageEntry> copy = new ArrayList<>(entries);

@@ -14,23 +14,28 @@ import java.util.*;
  */
 public class Metric_Histogram implements PlugIn {
 
-    /** Limiar de erro de área para determinar novos pontos de controle. */
+    // Limiar de tolerância: quanto maior o erro de área, menos comprimida a curva
+    // Valores baixos (0.05) geram mais pontos de controle, preservando detalhes
     private static final double AREA_ERROR_THRESHOLD = 0.05;
 
     @Override
     public void run(String arg) {
+        // Obtém a imagem aberta no ImageJ para usar como referência
         ImagePlus refImg = IJ.getImage();
         if (refImg == null) {
             IJ.error("Abra uma imagem de referência primeiro.");
             return;
         }
 
+        // Solicita ao usuário a pasta contendo as imagens de busca
         String folder = IJ.getDirectory("Selecione a pasta com as imagens de busca");
         if (folder == null) return;
 
+        // Extrai vetor de características da imagem de referência usando Histograma Métrico
         IJ.showStatus("Extraindo vetor da imagem de referência...");
         double[] refVec = extractFeatures(refImg.getProcessor().convertToByteProcessor());
 
+        // Carrega todas as imagens suportadas (.bmp, .png, .jpg, etc.) da pasta
         File dir = new File(folder);
         File[] files = dir.listFiles((d, n) -> n.toLowerCase().matches(".*\\.(bmp|png|jpg|jpeg|tif|tiff|gif)"));
         if (files == null || files.length == 0) {
@@ -38,6 +43,7 @@ public class Metric_Histogram implements PlugIn {
             return;
         }
 
+        // Processa cada imagem: abre, extrai vetor, fecha
         List<ImageEntry> entries = new ArrayList<>();
         for (int i = 0; i < files.length; i++) {
             IJ.showProgress(i, files.length);
@@ -48,8 +54,10 @@ public class Metric_Histogram implements PlugIn {
             img.close();
         }
 
+        // Salva todos os vetores para auditoria e análise posterior
         saveVectors(refImg.getTitle(), refVec, entries);
 
+        // Diálogo para configurar k (número de vizinhos) e função de distância
         GenericDialog gd = new GenericDialog("Busca K-NN");
         gd.addNumericField("Valor de k:", 5, 0);
         String[] distFuncs = {"Euclidiana", "Manhattan", "Chebyshev"};
@@ -60,6 +68,7 @@ public class Metric_Histogram implements PlugIn {
         int k = Math.max(1, (int) gd.getNextNumber());
         String distFunc = gd.getNextChoice();
 
+        // Executa k-NN e exibe resultados no log e arquivo
         List<ImageEntry> results = knnSearch(refVec, entries, k, distFunc);
         showResults(refImg.getTitle(), refVec, results, distFunc);
     }
@@ -80,10 +89,12 @@ public class Metric_Histogram implements PlugIn {
      *
      * <p>Algoritmo:
      * <ol>
-     *   <li>Normaliza o histograma convencional (256 bins);</li>
-     *   <li>Percorre os bins e avalia o erro de área entre a curva real e a interpolação linear;</li>
-     *   <li>Quando o erro supera o limiar, o bin anterior é registrado como ponto de controle;</li>
-     *   <li>O vetor final contém as coordenadas (nível de cinza normalizado, frequência) de cada ponto.</li>
+     *   <li>Normaliza o histograma convencional (256 bins) por frequência total;</li>
+     *   <li>Inicia um ponto de controle no primeiro bin (x=0);</li>
+     *   <li>Usa estratégia greedy: expande intervalos enquanto o erro de área ficar abaixo do limiar;</li>
+     *   <li>Quando o erro seria violado, o ponto anterior é marcado como de controle e o intervalo recomeça;</li>
+     *   <li>Garante que o último ponto (x=255) sempre está presente;</li>
+     *   <li>Resultado: representação comprimida da distribuição com poucos pontos.</li>
      * </ol>
      * </p>
      *
@@ -95,23 +106,28 @@ public class Metric_Histogram implements PlugIn {
         long total = 0;
         for (int v : hist) total += v;
 
+        // Normaliza para obter frequências relativas (soma = 1)
         double[] h = new double[n];
         for (int i = 0; i < n; i++) h[i] = (double) hist[i] / total;
 
+        // Inicia lista de pontos de controle com o primeiro ponto
         List<double[]> pts = new ArrayList<>();
         pts.add(new double[]{0, h[0]});
 
+        // Estratégia greedy: expande cada intervalo o máximo possível antes de criar novo ponto
         int start = 0;
         while (start < n - 1) {
             int end = start + 1;
+            // Encontra o maior intervalo [start, j] que ainda respeita o limiar de erro
             for (int j = start + 2; j < n; j++) {
                 if (areaError(h, start, j) <= AREA_ERROR_THRESHOLD) {
                     end = j;
-                }
-                else {
+                } else {
+                    // Uma vez que o erro é violado, intervalos maiores também violarão
                     break;
                 }
             }
+            // Se conseguiu expandir além de start+1, registra novo ponto de controle
             if (end > start) {
                 pts.add(new double[]{end, h[end]});
                 start = end;
@@ -120,14 +136,16 @@ public class Metric_Histogram implements PlugIn {
             }
         }
 
+        // Garante que o último ponto (x=255) sempre está na lista
         if (((int) pts.get(pts.size() - 1)[0]) != n - 1) {
             pts.add(new double[]{n - 1, h[n - 1]});
         }
 
+        // Converte para vetor com coordenadas normalizadas (x em [0,1], y como frequência)
         double[] vec = new double[pts.size() * 2];
         for (int i = 0; i < pts.size(); i++) {
-            vec[2 * i]     = pts.get(i)[0] / 255.0;
-            vec[2 * i + 1] = pts.get(i)[1];
+            vec[2 * i]     = pts.get(i)[0] / 255.0;  // nível de cinza normalizado
+            vec[2 * i + 1] = pts.get(i)[1];           // frequência relativa
         }
         return vec;
     }
@@ -135,18 +153,29 @@ public class Metric_Histogram implements PlugIn {
     /**
      * Calcula o erro de área entre o histograma real e a interpolação linear
      * entre os pontos {@code start} e {@code end}.
+     *
+     * Compara:
+     * - realArea: soma das frequências reais no intervalo [start, end]
+     * - linearArea: área sob a linha reta conectando (start, h[start]) e (end, h[end])
+     *
+     * Usado na estratégia greedy para determinar quando interromper a expansão de um intervalo.
      */
     private double areaError(double[] h, int start, int end) {
+        // Soma as frequências reais no intervalo
         double realArea = 0;
         for (int i = start; i <= end; i++) realArea += h[i];
+        // Estima a área sob a linha reta (trapézio com altura média)
         double linearArea = (end - start + 1) * (h[start] + h[end]) / 2.0;
         return Math.abs(realArea - linearArea);
     }
 
     /**
      * Reconstrói o histograma aproximado com 256 bins via interpolação linear
-     * entre os pontos de controle. Usado para normalizar o tamanho antes de
-     * calcular distâncias, evitando artefatos do padding com zeros.
+     * entre os pontos de controle.
+     *
+     * Propósito: normalizar o tamanho dos vetores antes de calcular distâncias,
+     * permitindo comparar vetores com números diferentes de pontos de controle.
+     * Isso elimina problemas de padding com zeros ou artefatos de tamanho.
      *
      * @param vec vetor de pontos de controle [x0,y0, x1,y1, ...]
      * @return histograma interpolado com exatamente 256 bins
@@ -156,9 +185,11 @@ public class Metric_Histogram implements PlugIn {
         double[] result = new double[256];
 
         for (int bin = 0; bin < 256; bin++) {
+            // Normaliza posição do bin para [0, 1] (corresponde a nível de cinza / 255)
             double x = bin / 255.0;
 
-            // encontra os dois pontos de controle que envolvem x
+            // Encontra os dois pontos de controle que envolvem x
+            // (busca linear, poderia ser binary search em vetores muito grandes)
             int lo = 0, hi = nPts - 1;
             for (int i = 0; i < nPts - 1; i++) {
                 if (vec[2 * i] <= x && x <= vec[2 * (i + 1)]) {
@@ -168,6 +199,7 @@ public class Metric_Histogram implements PlugIn {
                 }
             }
 
+            // Interpola linearmente entre os dois pontos encontrados
             double x0 = vec[2 * lo],     y0 = vec[2 * lo + 1];
             double x1 = vec[2 * hi],     y1 = vec[2 * hi + 1];
 
@@ -177,31 +209,41 @@ public class Metric_Histogram implements PlugIn {
     }
 
     /**
-     * Calcula a distância entre dois vetores de características.
-     * Ambos são reamostrados para 256 bins via interpolação linear antes
-     * da comparação, eliminando problemas de vetores com tamanhos diferentes.
+     * Calcula a distância entre dois vetores de características usando a função especificada.
+     *
+     * Ambos os vetores são reamostrados para 256 bins via interpolação linear antes
+     * da comparação, normalizando tamanhos diferentes e permitindo comparações justas.
      *
      * @param a        vetor da imagem de referência
      * @param b        vetor da imagem de busca
-     * @param distFunc "Euclidiana", "Manhattan" ou "Chebyshev"
+     * @param distFunc "Euclidiana" (raiz da soma de quadrados),
+     *                 "Manhattan" (soma de valores absolutos),
+     *                 "Chebyshev" (máxima diferença absoluta)
      * @return valor da distância
      */
     double computeDistance(double[] a, double[] b, String distFunc) {
+        // Normaliza ambos os vetores para 256 bins antes de comparar
         double[] ra = resample(a);
         double[] rb = resample(b);
 
         switch (distFunc) {
             case "Manhattan": {
+                // Soma das diferenças absolutas: útil para distribuições não-gaussianas
+                // Penaliza desvios proporcionalmente sem amplificar grandes diferenças
                 double d = 0;
                 for (int i = 0; i < 256; i++) d += Math.abs(ra[i] - rb[i]);
                 return d;
             }
             case "Chebyshev": {
+                // Máxima diferença absoluta: robusta a outliers
+                // Penaliza principalmente o pior desvio em qualquer posição
                 double d = 0;
                 for (int i = 0; i < 256; i++) d = Math.max(d, Math.abs(ra[i] - rb[i]));
                 return d;
             }
             default: { // Euclidiana
+                // Raiz da soma dos quadrados: métrica mais comum em ciência de dados
+                // Amplifica grandes diferenças, sensível a distribuições muito diferentes
                 double d = 0;
                 for (int i = 0; i < 256; i++) d += (ra[i] - rb[i]) * (ra[i] - rb[i]);
                 return Math.sqrt(d);
@@ -210,17 +252,27 @@ public class Metric_Histogram implements PlugIn {
     }
 
     /**
-     * Executa a busca k-NN: ordena as entradas por distância em relação ao vetor de referência.
+     * Executa a busca k-NN (k-vizinhos mais próximos).
+     *
+     * Algoritmo:
+     * <ol>
+     *   <li>Calcula a distância da imagem de referência para todas as imagens da lista;</li>
+     *   <li>Ordena as imagens por distância crescente;</li>
+     *   <li>Retorna apenas as k primeiras (vizinhos mais próximos).</li>
+     * </ol>
      *
      * @param refVec   vetor da imagem de referência
      * @param entries  lista de imagens de busca com seus vetores
-     * @param k        número de vizinhos
+     * @param k        número de vizinhos a retornar
      * @param distFunc função de distância a usar
-     * @return sublista com os k vizinhos mais próximos
+     * @return sublista com os k vizinhos mais próximos (ordenados por distância crescente)
      */
     List<ImageEntry> knnSearch(double[] refVec, List<ImageEntry> entries, int k, String distFunc) {
+        // Calcula distância para cada entrada em relação à referência
         for (ImageEntry e : entries) e.distance = computeDistance(refVec, e.vector, distFunc);
+        // Ordena por distância crescente (mais próximos primeiro)
         entries.sort(Comparator.comparingDouble(e -> e.distance));
+        // Retorna apenas os k primeiros
         return entries.subList(0, Math.min(k, entries.size()));
     }
 
